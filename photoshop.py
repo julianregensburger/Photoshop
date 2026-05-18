@@ -9,9 +9,15 @@ img_edit_display = None
 img_edit = None
 img_ori = None
 image_lbl = None
+last_img = []
+last_channel = [(100,100,100)]
+loaded = False
+back_count = 0
+draw_colors = [0,0,0]
+brush_size = 1
 
 def upload_file():
-    global img_ori, img_edit, img_edit_raw, image_lbl, img_edit_display
+    global img_ori, img_edit, img_edit_raw, image_lbl, img_edit_display, loaded, last_img
 
     dateipfad = filedialog.askopenfilename(
         title="Wähle eine Datei zum bearbeiten aus",
@@ -21,8 +27,12 @@ def upload_file():
     #Bild anzeigen im editor frame
     img_edit, img_edit_raw = load_image(size=(3200,2100),img_path=dateipfad)
     image_lbl = tk.Label(frame_editor, image=img_edit)
+    image_lbl.bind("<Button-1>", draw)
+    image_lbl.bind("<B1-Motion>",draw)
     image_lbl.place(x=0,y=0)
     img_edit_display = img_edit_raw.copy()
+    last_img.append(img_edit_display)
+
 
     #Bild anzeigen im original frame
     img_ori,_ = load_image(size=(800,700),img_path=dateipfad)
@@ -30,18 +40,27 @@ def upload_file():
     image_lbl_ori.place(x=0,y=0)
     image_lbl_ori.lift()
 
+    #Setze geladen variable auf True dass alle Funktionen es wissen
+    loaded = True
+
 def show(img):
     global img_edit
     img_edit = load_image(img_array=img)
     image_lbl.config(image=img_edit)
 
 def change_channel(value,channel):
-    global img_edit_raw, img_edit_display
-    value = int(value) / 100
-    img_edit_display[:,:,int(channel)] = img_edit_raw[:,:,int(channel)] * value
-    img_edit_display = np.clip(img_edit_display, 0, 255).astype(np.uint8)
+    global img_edit_raw, img_edit_display, loaded
+    if loaded:
+        value = int(value) / 100
+        img_edit_display[:,:,int(channel)] = img_edit_raw[:,:,int(channel)] * value
+        img_edit_display = np.clip(img_edit_display, 0, 255).astype(np.uint8)
+    
+        show(img=img_edit_display)
 
-    show(img=img_edit_display)
+def save_channel(event):
+    global last_img, img_edit_display, last_channel, r_channel, g_channel, b_channel
+    last_img.append(img_edit_display)
+    last_channel.append([r_channel.get(), g_channel.get(), b_channel.get()])
 
 def export_file():
     pass
@@ -53,9 +72,15 @@ def zoom():
     pass
 
 def back():
-    global img_edit_display, img_edit_raw
-    img_edit_display = img_edit_raw.copy()
-    show(img=img_edit_display)
+    global img_edit_display, img_edit_raw, back_count, loaded, last_img, last_channel, r_channel, g_channel, b_channel
+    if loaded:
+        if (len(last_img) - 1) - (back_count + 1) > len(last_img) *-1:
+            back_count += 1
+        img_edit_display = last_img[(len(last_img)-1) - back_count].copy()
+        r_channel.set(last_channel[(len(last_img)-1)- back_count][0])
+        g_channel.set(last_channel[(len(last_img)-1)- back_count][1])
+        b_channel.set(last_channel[(len(last_img)-1)- back_count][2])
+        show(img=img_edit_display)
 
 def forward():
     pass
@@ -63,8 +88,41 @@ def forward():
 def save():
     pass
 
-def frame_change(window):
-    pass
+def change_colors(value, channel):
+    global draw_colors
+    draw_colors[int(channel)] = int(value)
+
+def draw_circle(img, x, y):
+    global draw_colors, brush_size
+    h, w = img.shape[:2]
+
+    yy, xx = np.ogrid[:h, :w]
+
+    mask = (xx - x) ** 2 + (yy - y) ** 2 <= brush_size ** 2
+
+    img[mask] = draw_colors
+    return img
+
+def draw(event):
+    global img_edit_display
+    widget_w = event.widget.winfo_width()
+    widget_h = event.widget.winfo_height()
+
+    img_h, img_w = img_edit_display.shape[:2]
+
+    x = int(event.x * img_w / widget_w)
+    y = int(event.y * img_h / widget_h)
+
+    if 0 <= x < img_w and 0 <= y < img_h:
+        img_edit_display[y, x] = [0, 0, 0]
+    
+    img_edit_display = draw_circle(img_edit_display, x, y)
+    
+    show(img=img_edit_display)
+
+def change_brush_size(value):
+    global brush_size
+    brush_size = int(value)
 
 def setup_gui(root):
     """
@@ -157,8 +215,7 @@ def load_image(size=(3200,2100), img_path=None, img_array=None):
     return img
 
 def main():
-    global menu_btn
-
+    global menu_btn, r_channel, g_channel, b_channel
     root = tk.Tk()
 
     setup_gui(root)
@@ -236,17 +293,36 @@ def main():
     b_lbl.place(x=350, y=200)
     r_channel = tk.Scale(frame_channel, from_=100, to=0, width=40, command=lambda val: change_channel(val,0))
     r_channel.set(100)
+    r_channel.bind("<ButtonRelease-1>", save_channel)
     r_channel.place(x=50,y=300, height=600)
     g_channel = tk.Scale(frame_channel, from_=100, to=0, width=40, command=lambda val: change_channel(val,1))
     g_channel.set(100)
+    g_channel.bind("<ButtonRelease-1>", save_channel)
     g_channel.place(x=230,y=300, height=600)
     b_channel = tk.Scale(frame_channel, from_=100, to=0, width=40, command=lambda val: change_channel(val,2))
     b_channel.set(100)
+    b_channel.bind("<ButtonRelease-1>", save_channel)
     b_channel.place(x=410,y=300, height=600)
 
     #Buttons und Labels im Zeichnen layout
     draw_lbl = tk.Label(frame_draw,text="Zeichnen:", height=2, width=menu_label_width,font=("Arial", 25))
     draw_lbl.place(x=0,y=0)
+
+    r_lbl_draw = tk.Label(frame_draw,text="R", height=2, width=menu_label_width,font=("Arial", 10))
+    r_lbl_draw.place(x=50, y=200)
+    g_lbl_draw = tk.Label(frame_draw,text="G", height=2, width=menu_label_width,font=("Arial", 10))
+    g_lbl_draw.place(x=200, y=200)
+    b_lbl_draw = tk.Label(frame_draw,text="B", height=2, width=menu_label_width,font=("Arial", 10))
+    b_lbl_draw.place(x=350, y=200)
+    r_draw = tk.Scale(frame_draw, from_=255, to=0, width=40, command=lambda val: change_colors(val,0))  
+    r_draw.place(x=50,y=300, height=600)
+    g_draw = tk.Scale(frame_draw, from_=255, to=0, width=40, command=lambda val: change_colors(val,1)) 
+    g_draw.place(x=230,y=300, height=600)
+    b_draw = tk.Scale(frame_draw, from_=255, to=0, width=40, command=lambda val: change_colors(val,2)) 
+    b_draw.place(x=410,y=300, height=600)
+
+    paint_size = tk.Scale(frame_draw,from_=1 ,to=200, width=40, orient=tk.HORIZONTAL, command=change_brush_size)
+    paint_size.place(x=50,y=1000, width=600)
 
     #Buttons und Labels im Löschen layout 
     delete_lbl = tk.Label(frame_delete,text="Löschen:", height=2, width=menu_label_width,font=("Arial", 25))
