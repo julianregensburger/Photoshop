@@ -1,9 +1,17 @@
 import tkinter as tk
 from PIL import Image, ImageTk
 from tkinter import filedialog
+import numpy as np
+import matplotlib.pyplot as plt 
+
+img_edit_raw = None
+img_edit_display = None
+img_edit = None
+img_ori = None
+image_lbl = None
 
 def upload_file():
-    global img_ori, img_edit
+    global img_ori, img_edit, img_edit_raw, image_lbl, img_edit_display
 
     dateipfad = filedialog.askopenfilename(
         title="Wähle eine Datei zum bearbeiten aus",
@@ -11,15 +19,29 @@ def upload_file():
         filetypes=(("Bild Datei", "*.jpg"), ("Alle Dateien", "*.*")) # Filter
     )
     #Bild anzeigen im editor frame
-    img_edit = load_image(size=(3200,2100),img_path=dateipfad)
+    img_edit, img_edit_raw = load_image(size=(3200,2100),img_path=dateipfad)
     image_lbl = tk.Label(frame_editor, image=img_edit)
     image_lbl.place(x=0,y=0)
+    img_edit_display = img_edit_raw.copy()
 
     #Bild anzeigen im original frame
-    img_ori = load_image(size=(800,700),img_path=dateipfad)
-    image_lbl = tk.Label(frame_ori, image=img_ori)
-    image_lbl.place(x=0,y=0)
-    image_lbl.lift()
+    img_ori,_ = load_image(size=(800,700),img_path=dateipfad)
+    image_lbl_ori = tk.Label(frame_ori, image=img_ori)
+    image_lbl_ori.place(x=0,y=0)
+    image_lbl_ori.lift()
+
+def show(img):
+    global img_edit
+    img_edit = load_image(img_array=img)
+    image_lbl.config(image=img_edit)
+
+def change_channel(value,channel):
+    global img_edit_raw, img_edit_display
+    value = int(value) / 100
+    img_edit_display[:,:,int(channel)] = img_edit_raw[:,:,int(channel)] * value
+    img_edit_display = np.clip(img_edit_display, 0, 255).astype(np.uint8)
+
+    show(img=img_edit_display)
 
 def export_file():
     pass
@@ -31,7 +53,9 @@ def zoom():
     pass
 
 def back():
-    pass
+    global img_edit_display, img_edit_raw
+    img_edit_display = img_edit_raw.copy()
+    show(img=img_edit_display)
 
 def forward():
     pass
@@ -118,12 +142,19 @@ def frame_change(window):
             frame_menu.place(x=0,y=700)
             frame_menu.lift()
 
-def load_image(size, img_path):
+def load_image(size=(3200,2100), img_path=None, img_array=None):
     if img_path:
-        img_raw = Image.open(img_path)
-        img_resized = img_raw.resize(size) # Breite, Höhe anpassen
+        img = Image.open(img_path).convert("RGB")
+        img_resized = img.resize(size) # Breite, Höhe anpassen
         img = ImageTk.PhotoImage(img_resized)
-        return img
+
+        img_raw = np.array(Image.open(img_path))
+        return img, img_raw
+    
+    img = Image.fromarray(img_array).convert("RGB")
+    img_resized = img.resize(size)
+    img = ImageTk.PhotoImage(img_resized)
+    return img
 
 def main():
     global menu_btn
@@ -197,11 +228,25 @@ def main():
     channel_lbl = tk.Label(frame_channel,text="Kanal:", height=2, width=menu_label_width,font=("Arial", 25))
     channel_lbl.place(x=0,y=0)
 
+    r_lbl = tk.Label(frame_channel,text="R", height=2, width=menu_label_width,font=("Arial", 10))
+    r_lbl.place(x=50, y=200)
+    g_lbl = tk.Label(frame_channel,text="G", height=2, width=menu_label_width,font=("Arial", 10))
+    g_lbl.place(x=200, y=200)
+    b_lbl = tk.Label(frame_channel,text="B", height=2, width=menu_label_width,font=("Arial", 10))
+    b_lbl.place(x=350, y=200)
+    r_channel = tk.Scale(frame_channel, from_=100, to=0, width=40, command=lambda val: change_channel(val,0))
+    r_channel.set(100)
+    r_channel.place(x=50,y=300, height=600)
+    g_channel = tk.Scale(frame_channel, from_=100, to=0, width=40, command=lambda val: change_channel(val,1))
+    g_channel.set(100)
+    g_channel.place(x=230,y=300, height=600)
+    b_channel = tk.Scale(frame_channel, from_=100, to=0, width=40, command=lambda val: change_channel(val,2))
+    b_channel.set(100)
+    b_channel.place(x=410,y=300, height=600)
 
     #Buttons und Labels im Zeichnen layout
     draw_lbl = tk.Label(frame_draw,text="Zeichnen:", height=2, width=menu_label_width,font=("Arial", 25))
     draw_lbl.place(x=0,y=0)
-
 
     #Buttons und Labels im Löschen layout 
     delete_lbl = tk.Label(frame_delete,text="Löschen:", height=2, width=menu_label_width,font=("Arial", 25))

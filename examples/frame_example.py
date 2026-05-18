@@ -42,4 +42,3 @@ def main():
 
 
 main()
-print("Finished")
