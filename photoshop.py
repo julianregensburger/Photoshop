@@ -268,7 +268,19 @@ def forward():
 
 
 def save():
-    pass
+    global img_edit_raw
+    
+
+    dateipfad = filedialog.asksaveasfilename(
+        title="Bild speichern unter...",
+        defaultextension=".png",
+        filetypes=[("PNG-Bild", "*.png"), ("JPEG-Bild", "*.jpg"), ("Alle Dateien", "*.*")]
+    )
+    
+    if dateipfad:
+        img = Image.fromarray(img_edit_raw)
+        img.save(dateipfad)
+    
 
 def change_colors(value, channel):
     global draw_colors
