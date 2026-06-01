@@ -1,8 +1,10 @@
 import tkinter as tk
 from PIL import Image, ImageTk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 import numpy as np
-import matplotlib.pyplot as plt 
+import time
+import os
+import sys
 
 img_edit_raw = None
 img_edit_display = None
@@ -16,6 +18,11 @@ draw_colors = [0,0,0]
 brush_size = 1
 updating_sliders = False
 channel_dragging = False
+last_save = time.time()
+last_change = time.time()
+save_path = None
+zoom_enabled = False
+points = []
 
 # Modernes Design
 BG_DARK = "#151821"
@@ -71,18 +78,20 @@ def modern_scale(parent, **kwargs):
 
 
 def upload_file():
-    global img_ori, img_edit, img_edit_raw, image_lbl, img_edit_display, loaded, last_img
+    global img_ori, img_edit, img_edit_raw, image_lbl, img_edit_display, loaded, last_img, last_change
+    last_change = time.time()
 
     dateipfad = filedialog.askopenfilename(
         title="Wähle eine Datei zum bearbeiten aus",
         initialdir="/home/julian/Dokumente/Dokumente/FSST/Software/Korber/Photoshop", # Startverzeichnis
-        filetypes=(("Bild Datei", "*.jpg"), ("Alle Dateien", "*.*")) # Filter
+        filetypes=[("PNG-Bild", "*.png"), ("JPEG-Bild", "*.jpg"), ("Alle Dateien", "*.*")] # Filter
     )
     #Bild anzeigen im editor frame
     img_edit, img_edit_raw = load_image(size=(3200,2100),img_path=dateipfad)
     image_lbl = modern_label(frame_editor, image=img_edit)
     image_lbl.bind("<Button-1>", draw)
     image_lbl.bind("<B1-Motion>",draw)
+    image_lbl.bind("<Button-1>", zoom)
     image_lbl.place(x=0,y=0)
     img_edit_display = img_edit_raw.copy()
     save_history()
@@ -99,6 +108,7 @@ def upload_file():
 
 def show(img):
     global img_edit
+    last_change = time.time()
     img_edit = load_image(img_array=img)
     image_lbl.config(image=img_edit)
 
@@ -186,31 +196,103 @@ def save_start_channel(event):
         channel_dragging = True
     
 def export_file():
-    pass
+    global img_edit_raw, last_save, save_path, loaded
+    if loaded:    
+        if save_path is None:
+            save_path = filedialog.asksaveasfilename(
+                title="Bild speichern unter...",
+                defaultextension=".png",
+                filetypes=[("PNG-Bild", "*.png"), ("JPEG-Bild", "*.jpg"), ("Alle Dateien", "*.*")]
+            )
+
+            if save_path:
+                last_save = time.time()
+                img = Image.fromarray(img_edit_raw)
+                img.save(save_path)
+        else:
+            save()
+    
 
 def new_file():
-    pass
+    global last_save, last_change, root, loaded
+    if loaded:
+        if (last_save - last_change) < 0:
+            answer = messagebox.askyesno("Schließen ohne speichern", "Möchten Sie die Datei vorher speichern?")
+            if answer:
+                export_file()
+        root.destroy()
+        python_pfad = "/home/julian/venvs/fsst/bin/python"
+        skript_pfad = (
+            "/home/julian/Dokumente/Dokumente/FSST/Software/Korber/Photoshop/photoshop.py"
+        )
+        # Prozess mit der genauen venv-Python-Umgebung neu starten
+        os.execv(python_pfad, [python_pfad, skript_pfad] + sys.argv[1:])
 
-def zoom():
-    pass
+
+def switch_zoom():
+    global zoom_enabled
+    if zoom_enabled:
+        zoom_enabled = False
+    else:
+        zoom_enabled = True
+
+def zoom(event):
+    global zoom_enabled, img_edit_raw, points
+    if zoom_enabled:
+        widget_w = event.widget.winfo_width()
+        widget_h = event.widget.winfo_height()
+
+        img_h, img_w = img_edit_raw.shape[:2]
+
+        x = int(event.x * img_w / widget_w)
+        y = int(event.y * img_h / widget_h)
+        
+        points.append([x,y])
+
+        if len(points) == 2:
+            save_history()
+
+            x_max, x_min, y_max, y_min, points = calculate_rectangle(points)
+
+            img_edit_raw = img_edit_raw[y_min : y_max + 1, x_min : x_max + 1]
+
+            show(img=img_edit_raw)
+
+def calculate_rectangle(points):
+    x1, y1 = points[0]
+    x2, y2 = points[1]
+    
+    # Eckpunkte ermitteln
+    x_min, x_max = min(x1, x2), max(x1, x2)
+    y_min, y_max = min(y1, y2), max(y1, y2)
+    points = []
+
+    return x_max, x_min, y_max, y_min, points       
 
 def invert_x():
-    global img_edit_raw, last_img, back_count
+    global img_edit_raw
     save_history()
     img_edit_raw = img_edit_raw[::-1,:]
     show(img=img_edit_raw)
 
 def invert_y():
-    global img_edit_raw, last_img, back_count
+    global img_edit_raw
     save_history()
     img_edit_raw = img_edit_raw[:,::-1]
     show(img=img_edit_raw)
 
 def invert_color():
-    global img_edit_raw, last_img, back_count
+    global img_edit_raw
     save_history()
     for i in range(3):
         img_edit_raw[:,:,i] = 255 - img_edit_raw[:,:,i]
+    show(img=img_edit_raw)
+
+def white_black():
+    global img_edit_raw
+    save_history()
+    img_edit_raw = np.mean(img_edit_raw[..., :3], axis=2).astype(np.uint8)
+    img_edit_raw = np.stack([img_edit_raw, img_edit_raw, img_edit_raw], axis=-1)
     show(img=img_edit_raw)
 
 def back():
@@ -268,18 +350,14 @@ def forward():
 
 
 def save():
-    global img_edit_raw
-    
-
-    dateipfad = filedialog.asksaveasfilename(
-        title="Bild speichern unter...",
-        defaultextension=".png",
-        filetypes=[("PNG-Bild", "*.png"), ("JPEG-Bild", "*.jpg"), ("Alle Dateien", "*.*")]
-    )
-    
-    if dateipfad:
-        img = Image.fromarray(img_edit_raw)
-        img.save(dateipfad)
+    global save_path, img_edit_raw, loaded
+    if loaded:   
+        if save_path:
+            last_save = time.time()
+            img = Image.fromarray(img_edit_raw)
+            img.save(save_path)
+        else:
+            messagebox.showwarning("Fehlender Pfad", "Sie müssen die Datei zuerst exportiern und eine Pfad auswählen!")
     
 
 def change_colors(value, channel):
@@ -421,7 +499,7 @@ def load_image(size=(3200,2100), img_path=None, img_array=None):
     return img
 
 def main():
-    global menu_btn, r_channel, g_channel, b_channel
+    global menu_btn, r_channel, g_channel, b_channel, root
     root = tk.Tk()
 
     setup_gui(root)
@@ -442,7 +520,7 @@ def main():
     new_btn = modern_button(frame_top_menu, text="Neu", command=new_file)
     new_btn.place(x=550, y=25, height=menu_btn_height, width=menu_btn_width)
 
-    zoom_btn = modern_button(frame_top_menu, text="Zoom", command=zoom)
+    zoom_btn = modern_button(frame_top_menu, text="Zoom", command=switch_zoom)
     zoom_btn.place(x=800, y=25, height=menu_btn_height, width=menu_btn_width)
 
     back_btn = modern_button(frame_top_menu, text="Zurück", command=back)
@@ -558,11 +636,12 @@ def main():
     inv_color = modern_button(frame_edit, text="Invert Color", command=invert_color)
     inv_color.place(x=50, y=600, height=menu_btn_height, width=menu_btn_width)
   
-
-
     #Buttons und Labels im Graustufen layout
     grey_lbl = modern_label(frame_grey,text="Graustufen:", height=2, width=menu_label_width,font=FONT_TITLE)
     grey_lbl.place(x=0,y=0)
+
+    make_grey = modern_button(frame_grey, text="Schwarz/Weiß", command=white_black)
+    make_grey.place(x=50, y=200, height=menu_btn_height, width=menu_btn_width+50)
 
 
     #Jedes Frame nach ganz oben setzen dass sie alle zu sehen sind
