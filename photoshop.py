@@ -78,7 +78,23 @@ def modern_scale(parent, **kwargs):
 
 
 def upload_file():
+    """
+    Öffnet einen Dateidialog zum Laden eines Bildes.
+
+    Funktion:
+    - Lässt den Nutzer ein Bild (PNG/JPG) auswählen.
+    - Lädt das Bild in voller Auflösung für den Editor und verkleinert für die Original-Ansicht.
+    - Bindet Maus-Events (Zeichnen, Zoom) an das Editor-Label.
+    - Setzt den globalen Status auf geladen ('loaded = True').
+
+    Parameter:
+        Keine
+
+    Rückgabewert:
+        Keiner (None) - Modifiziert globale Variablen (img_ori, img_edit_raw, etc.).
+    """
     global img_ori, img_edit, img_edit_raw, image_lbl, img_edit_display, loaded, last_img, last_change
+
     last_change = time.time()
 
     dateipfad = filedialog.askopenfilename(
@@ -107,12 +123,40 @@ def upload_file():
     loaded = True
 
 def show(img):
+    """
+    Aktualisiert die Bildanzeige im Tkinter-Editor-Fenster.
+
+    Funktion:
+    - Konvertiert das übergebene NumPy-Array in ein Tkinter-kompatibles Bildformat.
+    - Aktualisiert das bestehende 'image_lbl' im GUI, um Änderungen sofort sichtbar zu machen.
+
+    Parameter:
+        img (numpy.ndarray): Das anzuzeigende Bild-Array.
+
+    Rückgabewert:
+        Keiner (None)
+    """
     global img_edit
     last_change = time.time()
     img_edit = load_image(img_array=img)
     image_lbl.config(image=img_edit)
 
 def change_channel(value, channel):
+    """
+    Manipuliert die Intensität eines einzelnen Farbkanals (R, G oder B).
+
+    Funktion:
+    - Multipliziert den gewählten Kanal des Originalbildes mit dem Faktor des Sliders.
+    - Begrenzt die Pixelwerte auf das Intervall [0, 255].
+    - Aktualisiert die Live-Vorschau im GUI über die show()-Funktion.
+
+    Parameter:
+        value (str/int): Der aktuelle Wert des Sliders (wird durch 100 geteilt).
+        channel (int): Der Index des Farbkanals (0 = Rot, 1 = Grün, 2 = Blau).
+
+    Rückgabewert:
+        Keiner (None)
+    """
     global img_edit_raw, img_edit_display, loaded, updating_sliders
 
     if updating_sliders:
@@ -128,6 +172,20 @@ def change_channel(value, channel):
         show(img_edit_display)
 
 def save_channel(event):
+    """
+    Speichert die aktuelle Kanaländerung dauerhaft im Bearbeitungsbild.
+
+    Funktion:
+    - Übernimmt die Live-Vorschau der Kanaländerung in das echte Bearbeitungsbild.
+    - Wird beim Loslassen eines RGB-Sliders ausgeführt.
+    - Beendet den Status, dass gerade ein Kanal-Slider bewegt wird.
+
+    Parameter:
+        event (tkinter.Event): Das Event, das beim Loslassen des Sliders ausgelöst wird.
+
+    Rückgabewert:
+        Keiner (None)
+    """
     global img_edit_raw, img_edit_display, channel_dragging
 
     if loaded and img_edit_display is not None:
@@ -189,6 +247,20 @@ def modern_scale(parent, **kwargs):
 
 
 def save_start_channel(event):
+    """
+    Speichert den aktuellen Bildzustand vor einer Kanaländerung in der History.
+
+    Funktion:
+    - Wird beim Anklicken eines RGB-Sliders ausgeführt.
+    - Speichert den aktuellen Zustand nur einmal pro Slider-Bewegung.
+    - Aktiviert den Status, dass gerade ein Kanal bearbeitet wird.
+
+    Parameter:
+        event (tkinter.Event): Das Event, das beim Drücken auf den Slider ausgelöst wird.
+
+    Rückgabewert:
+        Keiner (None)
+    """
     global channel_dragging, loaded
 
     if loaded and not channel_dragging:
@@ -196,6 +268,20 @@ def save_start_channel(event):
         channel_dragging = True
     
 def export_file():
+    """
+    Speichert das bearbeitete Bild auf der Festplatte.
+
+    Funktion:
+    - Fragt beim ersten Speichern über einen Dialog nach dem Zielpfad.
+    - Konvertiert das aktuelle NumPy-Array zurück in ein PIL-Image und speichert es.
+    - Überschreibt die Datei direkt, falls bereits ein Pfad existiert.
+
+    Parameter:
+        Keine
+
+    Rückgabewert:
+        Keiner (None)
+    """
     global img_edit_raw, last_save, save_path, loaded
     if loaded:    
         if save_path is None:
@@ -214,6 +300,20 @@ def export_file():
     
 
 def new_file():
+    """
+    Schließt das aktuelle Projekt und startet die Anwendung sauber neu.
+
+    Funktion:
+    - Prüft auf ungespeicherte Änderungen und öffnet ggf. eine Ja/Nein-Abfrage zum Speichern.
+    - Schließt das aktuelle Tkinter-Fenster.
+    - Startet das Skript im exakten virtuellen Environment (venv) komplett neu.
+
+    Parameter:
+        Keine
+
+    Rückgabewert:
+        Keiner (None) - Beendet den aktuellen Python-Prozess.
+    """
     global last_save, last_change, root, loaded
     if loaded:
         if (last_save - last_change) < 0:
@@ -237,6 +337,20 @@ def switch_zoom():
         zoom_enabled = True
 
 def zoom(event):
+    """
+    Führt das Zuschneiden (Slicing) des Bildes basierend auf zwei Klicks aus.
+
+    Funktion:
+    - Berechnet die relativen Pixelkoordinaten auf dem echten Bild anhand der Klickposition im Widget.
+    - Sammelt Punkte. Sobald zwei Punkte vorliegen, wird die History gesichert.
+    - Schneidet das NumPy-Array auf das gewählte Rechteck zu und aktualisiert die Anzeige.
+
+    Parameter:
+        event (tkinter.Event): Das Maus-Klick-Event, das X- und Y-Koordinaten liefert.
+
+    Rückgabewert:
+        Keiner (None)
+    """
     global zoom_enabled, img_edit_raw, points
     if zoom_enabled:
         widget_w = event.widget.winfo_width()
@@ -259,6 +373,20 @@ def zoom(event):
             show(img=img_edit_raw)
 
 def calculate_rectangle(points):
+    """
+    Berechnet die minimalen und maximalen Grenzen aus zwei diagonalen Punkten.
+
+    Funktion:
+    - Ermittelt die Extremwerte (Min/Max) für X und Y, um ein achsenparalleles Rechteck aufzuspannen.
+    - Leert die temporäre Punkteliste für den nächsten Zoom-Vorgang.
+
+    Parameter:
+        points (list): Eine Liste, die zwei Koordinaten-Paare [[x1, y1], [x2, y2]] enthält.
+
+    Rückgabewert:
+        tuple: (x_max, x_min, y_max, y_min, points)
+               Die Koordinatengrenzen als Integer und eine leere Liste zum Zurücksetzen.
+    """
     x1, y1 = points[0]
     x2, y2 = points[1]
     
@@ -296,6 +424,22 @@ def white_black():
     show(img=img_edit_raw)
 
 def back():
+    """
+    Macht die letzte Bildänderung rückgängig.
+
+    Funktion:
+    - Prüft, ob ein Bild geladen ist und ob Einträge im Undo-Stack vorhanden sind.
+    - Speichert den aktuellen Zustand im Redo-Stack.
+    - Lädt den letzten gespeicherten Zustand aus dem Undo-Stack.
+    - Stellt auch die RGB-Slider-Werte wieder her.
+    - Aktualisiert anschließend die Anzeige im Editor.
+
+    Parameter:
+        Keine
+
+    Rückgabewert:
+        Keiner (None)
+    """
     global img_edit_raw, img_edit_display, undo_stack, redo_stack, loaded, last_channel, r_channel, g_channel, b_channel, aktiv_frame
 
     if loaded and len(undo_stack) > 0:
@@ -328,6 +472,22 @@ def save_history():
         redo_stack.clear()
 
 def forward():
+    """
+    Stellt eine zuvor rückgängig gemachte Änderung wieder her.
+
+    Funktion:
+    - Prüft, ob ein Bild geladen ist und ob Einträge im Redo-Stack vorhanden sind.
+    - Speichert den aktuellen Zustand im Undo-Stack.
+    - Lädt den letzten Zustand aus dem Redo-Stack.
+    - Stellt auch die RGB-Slider-Werte wieder her.
+    - Aktualisiert anschließend die Anzeige im Editor.
+
+    Parameter:
+        Keine
+
+    Rückgabewert:
+        Keiner (None)
+    """
     global img_edit_raw, undo_stack, redo_stack, loaded, r_channel, g_channel, b_channel
 
     if loaded and len(redo_stack) > 0:
@@ -365,6 +525,22 @@ def change_colors(value, channel):
     draw_colors[int(channel)] = int(value)
 
 def draw_circle(img, x, y):
+    """
+    Zeichnet einen gefüllten Kreis auf das Bild.
+
+    Funktion:
+    - Berechnet eine kreisförmige Maske um die angegebene Position.
+    - Färbt alle Pixel innerhalb des Kreises mit der aktuellen Pinselfarbe.
+    - Nutzt die globale Pinselgröße als Radius.
+
+    Parameter:
+        img (numpy.ndarray): Das Bild, auf dem gezeichnet wird.
+        x (int): Die X-Koordinate des Kreismittelpunkts.
+        y (int): Die Y-Koordinate des Kreismittelpunkts.
+
+    Rückgabewert:
+        numpy.ndarray: Das bearbeitete Bildarray.
+    """
     global draw_colors, brush_size
     h, w = img.shape[:2]
 
@@ -376,6 +552,21 @@ def draw_circle(img, x, y):
     return img
 
 def draw(event):
+    """
+    Zeichnet mit dem aktuellen Pinsel auf das Bild.
+
+    Funktion:
+    - Prüft, ob der Zeichenmodus aktiv ist.
+    - Rechnet die Mausposition im Widget auf die echten Bildkoordinaten um.
+    - Zeichnet an dieser Position einen Kreis mit der aktuellen Pinselfarbe und Pinselgröße.
+    - Aktualisiert anschließend die Anzeige im Editor.
+
+    Parameter:
+        event (tkinter.Event): Das Maus-Event mit X- und Y-Koordinaten.
+
+    Rückgabewert:
+        Keiner (None)
+    """
     global img_edit_raw, aktiv_frame
     if aktiv_frame.get() == "draw":
 
@@ -436,6 +627,21 @@ def setup_gui(root):
     frame_grey= modern_frame(root, width=800, height=1600, bg=BG_PANEL)
 
 def frame_change(window):
+    """
+    Wechselt zwischen den verschiedenen Menü-Frames der Anwendung.
+
+    Funktion:
+    - Blendet je nach Auswahl den passenden Menübereich ein.
+    - Hebt den aktiven Frame nach vorne.
+    - Setzt die Variable aktiv_frame auf den aktuellen Bereich.
+    - Ermöglicht den Wechsel zwischen Home, Kanal, Zeichnen, Löschen, Einfügen, Ändern und Graustufen.
+
+    Parameter:
+        window (str): Der Name des Frames, zu dem gewechselt werden soll.
+
+    Rückgabewert:
+        Keiner (None)
+    """
     global aktiv_frame
     match window:
         case "channel":
@@ -485,6 +691,25 @@ def frame_change(window):
             aktiv_frame.set("menu")
 
 def load_image(size=(3200,2100), img_path=None, img_array=None):
+    """
+    Lädt ein Bild aus einer Datei oder aus einem NumPy-Array.
+
+    Funktion:
+    - Wenn ein Dateipfad übergeben wird, wird das Bild geöffnet, skaliert und als Tkinter-Bild zurückgegeben.
+    - Zusätzlich wird beim Laden aus einer Datei das unbearbeitete Bild als NumPy-Array zurückgegeben.
+    - Wenn ein NumPy-Array übergeben wird, wird daraus ein Tkinter-kompatibles Bild erstellt.
+    - Wird sowohl zum ersten Laden als auch zum Aktualisieren der Anzeige verwendet.
+
+    Parameter:
+        size (tuple): Die gewünschte Anzeigegröße als (Breite, Höhe).
+        img_path (str): Optionaler Dateipfad zu einem Bild.
+        img_array (numpy.ndarray): Optionales Bildarray, aus dem ein Bild erzeugt wird.
+
+    Rückgabewert:
+        tuple oder ImageTk.PhotoImage:
+            - Bei img_path: (PhotoImage, numpy.ndarray)
+            - Bei img_array: PhotoImage
+    """
     if img_path:
         img = Image.open(img_path).convert("RGB")
         img_resized = img.resize(size) # Breite, Höhe anpassen
@@ -499,6 +724,22 @@ def load_image(size=(3200,2100), img_path=None, img_array=None):
     return img
 
 def main():
+    """
+    Startet die komplette Tkinter-Anwendung.
+
+    Funktion:
+    - Erstellt das Hauptfenster.
+    - Ruft setup_gui() auf, um die Grundstruktur der Oberfläche zu erzeugen.
+    - Erstellt alle Buttons, Labels und Slider.
+    - Verknüpft die GUI-Elemente mit den passenden Funktionen.
+    - Startet die Tkinter-Hauptschleife.
+
+    Parameter:
+        Keine
+
+    Rückgabewert:
+        Keiner (None)
+    """
     global menu_btn, r_channel, g_channel, b_channel, root
     root = tk.Tk()
 
