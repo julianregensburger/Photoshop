@@ -790,14 +790,8 @@ def main():
     draw_btn = modern_button(frame_menu, text="Zeichnen", command=lambda: frame_change("draw"))
     draw_btn.place(x=50, y=400, height=menu_btn_height, width=menu_btn_width)
 
-    delete_btn = modern_button(frame_menu, text="Löschen", command=lambda: frame_change("delete"))
-    delete_btn.place(x=50, y=600, height=menu_btn_height, width=menu_btn_width)
-
-    insert_btn = modern_button(frame_menu, text="Einfügen", command=lambda: frame_change("insert"))
-    insert_btn.place(x=50, y=800, height=menu_btn_height, width=menu_btn_width)
-
     edit_btn = modern_button(frame_menu, text="Ändern", command=lambda: frame_change("edit"))
-    edit_btn.place(x=50, y=1000, height=menu_btn_height, width=menu_btn_width)
+    edit_btn.place(x=450, y=400, height=menu_btn_height, width=menu_btn_width)
 
     grey_btn = modern_button(frame_menu, text="Graustufen", command=lambda: frame_change("grey"))
     grey_btn.place(x=450, y=200, height=menu_btn_height, width=menu_btn_width)
@@ -853,15 +847,6 @@ def main():
     paint_lbl.place(x=50, y=950)
     paint_size = modern_scale(frame_draw,from_=1 ,to=200, width=40, orient=tk.HORIZONTAL, command=change_brush_size)
     paint_size.place(x=50,y=1000, width=604)
-
-    #Buttons und Labels im Löschen layout 
-    delete_lbl = modern_label(frame_delete,text="Löschen:", height=2, width=menu_label_width,font=FONT_TITLE)
-    delete_lbl.place(x=0,y=0)
-
-
-    #Buttons und Labels im Einfügen layout
-    insert_lbl = modern_label(frame_insert,text="Einfügen:", height=2, width=menu_label_width,font=FONT_TITLE)
-    insert_lbl.place(x=0,y=0)
 
 
     #Buttons und Labels im Ändern layout
